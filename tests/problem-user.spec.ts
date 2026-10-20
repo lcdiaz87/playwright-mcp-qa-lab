@@ -1,8 +1,31 @@
 import { test, expect } from '../pages/fixtures';
 
-// Mismo flujo con los dos usuarios: standard_user debe pasar todo y
-// problem_user tiene bugs conocidos, marcados con test.fail() para que
-// el informe los muestre como "fallo esperado" y avise si se arreglan.
+// problem_user es un usuario de saucedemo con bugs puestos a propósito.
+// Explorándolo con Playwright MCP y comparándolo con standard_user, que
+// funciona bien, aparecieron seis:
+//
+//   1. Imágenes: los 6 productos muestran la misma foto (sl-404.jpg).
+//   2. Ordenación: elegir "Price (low to high)" no cambia nada; el primero
+//      sigue siendo Sauce Labs Backpack en vez de Sauce Labs Onesie.
+//   3. Add to cart: solo funciona en 3 productos. Bolt T-Shirt, Fleece
+//      Jacket y T-Shirt (Red) no se añaden y el contador se queda en 3.
+//   4. Remove: no quita el producto; el contador no baja.
+//   5. Checkout: lo que se escribe en Last Name acaba en First Name, que
+//      pierde su valor ("Luis" / "Diaz" queda como "Diaz" / vacío).
+//   6. Por el bug 5, la compra no pasa del paso 1: "Last Name is required".
+//
+// Cómo se comprobó: con el navegador del MCP los resultados salieron
+// erráticos (a veces ningún clic respondía, ni siquiera con standard_user),
+// así que todo se repitió en navegadores limpios de Playwright. Ahí el
+// comportamiento fue el mismo en cada ejecución, y es el que documentan
+// estos tests.
+//
+// Cada test describe lo que debería pasar y se ejecuta con los dos usuarios.
+// Con problem_user va marcado con test.fail(): si falla, cuenta como "fallo
+// esperado" y la suite sigue en verde; si un día pasa, Playwright avisa de
+// que el bug se ha corregido y hay que quitar la marca. Para comprobar que
+// cada uno falla por su bug y no por un selector roto, se ejecutaron una vez
+// sin la marca: fallan en su propia aserción con los valores de arriba.
 const users = ['standard_user', 'problem_user'] as const;
 
 const products = [
