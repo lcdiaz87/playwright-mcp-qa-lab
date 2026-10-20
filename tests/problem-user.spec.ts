@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '../pages/fixtures';
 
 // Mismo flujo con los dos usuarios: standard_user debe pasar todo y
 // problem_user tiene bugs conocidos, marcados con test.fail() para que
@@ -6,98 +6,92 @@ import { test, expect, type Page } from '@playwright/test';
 const users = ['standard_user', 'problem_user'] as const;
 
 const products = [
-  'sauce-labs-backpack',
-  'sauce-labs-bike-light',
-  'sauce-labs-bolt-t-shirt',
-  'sauce-labs-fleece-jacket',
-  'sauce-labs-onesie',
-  'test.allthethings()-t-shirt-(red)',
+  'Sauce Labs Backpack',
+  'Sauce Labs Bike Light',
+  'Sauce Labs Bolt T-Shirt',
+  'Sauce Labs Fleece Jacket',
+  'Sauce Labs Onesie',
+  'Test.allTheThings() T-Shirt (Red)',
 ];
-
-async function login(page: Page, username: string) {
-  await page.goto('/');
-  await page.getByRole('textbox', { name: 'Username' }).fill(username);
-  await page.getByRole('textbox', { name: 'Password' }).fill('secret_sauce');
-  await page.getByRole('button', { name: 'Login' }).click();
-  await expect(page).toHaveURL(/inventory\.html/);
-}
 
 for (const user of users) {
   test.describe(`Inventario y checkout con ${user}`, () => {
     const knownBug = (description: string) => test.fail(user === 'problem_user', description);
 
-    test.beforeEach(async ({ page }) => {
-      await login(page, user);
+    test.beforeEach(async ({ loginPage }) => {
+      await loginPage.loginAs(user);
     });
 
-    test('cada producto muestra su propia imagen', async ({ page }) => {
+    test('cada producto muestra su propia imagen', async ({ inventoryPage }) => {
       knownBug('Bug: las 6 imágenes son la misma (sl-404)');
 
-      const sources = await page
-        .locator('[data-test="inventory-item"] img')
-        .evaluateAll((imgs) => imgs.map((img) => img.getAttribute('src')));
+      const sources = await inventoryPage.itemImages.evaluateAll((imgs) => imgs.map((img) => img.getAttribute('src')));
       expect(new Set(sources).size).toBe(products.length);
     });
 
-    test('ordenar por Price (low to high)', async ({ page }) => {
+    test('ordenar por Price (low to high)', async ({ inventoryPage }) => {
       knownBug('Bug: la ordenación no cambia y se queda en Name (A to Z)');
 
-      await page.getByRole('combobox', { name: 'Sort products' }).selectOption('Price (low to high)');
-      await expect(page.getByTestId('inventory-item-name').first()).toHaveText('Sauce Labs Onesie');
+      await inventoryPage.sortBy('Price (low to high)');
+      await expect(inventoryPage.itemNames.first()).toHaveText('Sauce Labs Onesie');
     });
 
-    test('añadir los 6 productos al carrito', async ({ page }) => {
+    test('añadir los 6 productos al carrito', async ({ inventoryPage, header }) => {
       knownBug('Bug: Bolt T-Shirt, Fleece Jacket y T-Shirt (Red) no se añaden');
 
-      for (const id of products) {
-        await page.getByTestId(`add-to-cart-${id}`).click();
+      for (const product of products) {
+        await inventoryPage.addToCart(product);
       }
-      await expect(page.getByTestId('shopping-cart-badge')).toHaveText(String(products.length));
+      await expect(header.cartBadge).toHaveText(String(products.length));
     });
 
-    test('quitar un producto desde el inventario', async ({ page }) => {
+    test('quitar un producto desde el inventario', async ({ inventoryPage, header }) => {
       knownBug('Bug: el botón Remove no hace nada');
 
-      await page.getByTestId('add-to-cart-sauce-labs-backpack').click();
-      await expect(page.getByTestId('shopping-cart-badge')).toHaveText('1');
+      await inventoryPage.addToCart('Sauce Labs Backpack');
+      await expect(header.cartBadge).toHaveText('1');
 
-      await page.getByTestId('remove-sauce-labs-backpack').click();
-      await expect(page.getByTestId('shopping-cart-badge')).toHaveCount(0);
+      await inventoryPage.removeFromCart('Sauce Labs Backpack');
+      await expect(header.cartBadge).toHaveCount(0);
     });
 
-    test('el formulario de checkout guarda cada campo', async ({ page }) => {
+    test('el formulario de checkout guarda cada campo', async ({ inventoryPage, header, cartPage, checkoutInformationPage }) => {
       knownBug('Bug: lo escrito en Last Name acaba en First Name');
 
-      await page.getByTestId('add-to-cart-sauce-labs-backpack').click();
-      await page.getByTestId('shopping-cart-link').click();
-      await page.getByRole('button', { name: 'Checkout' }).click();
+      await inventoryPage.addToCart('Sauce Labs Backpack');
+      await header.openCart();
+      await cartPage.checkout();
 
-      await page.getByTestId('firstName').fill('Luis');
-      await page.getByTestId('lastName').fill('Diaz');
-      await page.getByTestId('postalCode').fill('28001');
+      await checkoutInformationPage.fill('Luis', 'Diaz', '28001');
 
-      await expect(page.getByTestId('firstName')).toHaveValue('Luis');
-      await expect(page.getByTestId('lastName')).toHaveValue('Diaz');
-      await expect(page.getByTestId('postalCode')).toHaveValue('28001');
+      await expect(checkoutInformationPage.firstName).toHaveValue('Luis');
+      await expect(checkoutInformationPage.lastName).toHaveValue('Diaz');
+      await expect(checkoutInformationPage.postalCode).toHaveValue('28001');
     });
 
-    test('completar una compra', async ({ page }) => {
+    test('completar una compra', async ({
+      page,
+      inventoryPage,
+      header,
+      cartPage,
+      checkoutInformationPage,
+      checkoutOverviewPage,
+      checkoutCompletePage,
+    }) => {
       knownBug('Bug: no se pasa del paso 1 del checkout (Last Name is required)');
 
-      await page.getByTestId('add-to-cart-sauce-labs-backpack').click();
-      await page.getByTestId('shopping-cart-link').click();
-      await page.getByRole('button', { name: 'Checkout' }).click();
+      await inventoryPage.addToCart('Sauce Labs Backpack');
+      await header.openCart();
+      await cartPage.checkout();
 
-      await page.getByTestId('firstName').fill('Luis');
-      await page.getByTestId('lastName').fill('Diaz');
-      await page.getByTestId('postalCode').fill('28001');
-      await page.getByRole('button', { name: 'Continue' }).click();
+      await checkoutInformationPage.fill('Luis', 'Diaz', '28001');
+      await checkoutInformationPage.continue();
 
       await expect(page).toHaveURL(/checkout-step-two\.html/);
-      await expect(page.getByTestId('total-label')).toHaveText('Total: $32.39');
-      await page.getByRole('button', { name: 'Finish' }).click();
+      await expect(checkoutOverviewPage.total).toHaveText('Total: $32.39');
+      await checkoutOverviewPage.finish();
 
-      await expect(page.getByTestId('complete-header')).toHaveText('Thank you for your order!');
+      await expect(checkoutCompletePage.heading).toBeVisible();
     });
   });
 }

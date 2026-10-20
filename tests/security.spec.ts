@@ -1,36 +1,36 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../pages/fixtures';
 
 // El login de saucedemo se resuelve entero en el navegador: el código
 // compara la contraseña y guarda el usuario en una cookie sin firmar.
 // Los tests describen lo que debería pasar; los que hoy fallan por ese
 // diseño van marcados con test.fail() y avisarán si se corrige.
 
-test('una cookie de sesión falsificada no debería dar acceso', async ({ page, context }) => {
+test('una cookie de sesión falsificada no debería dar acceso', async ({ page, context, inventoryPage }) => {
   test.fail(true, 'Bug de seguridad: basta con crear session-username=standard_user para entrar');
 
   await context.addCookies([
     { name: 'session-username', value: 'standard_user', url: 'https://www.saucedemo.com' },
   ]);
-  await page.goto('/inventory.html');
+  await inventoryPage.goto();
 
   await expect(page).toHaveURL('/');
-  await expect(page.getByTestId('inventory-item')).toHaveCount(0);
+  await expect(inventoryPage.items).toHaveCount(0);
 });
 
-test('una cookie con un usuario inexistente no da acceso', async ({ page, context }) => {
+test('una cookie con un usuario inexistente no da acceso', async ({ page, context, inventoryPage }) => {
   await context.addCookies([
     { name: 'session-username', value: 'cualquier_cosa', url: 'https://www.saucedemo.com' },
   ]);
-  await page.goto('/inventory.html');
+  await inventoryPage.goto();
 
   await expect(page).toHaveURL('/');
-  await expect(page.getByTestId('inventory-item')).toHaveCount(0);
+  await expect(inventoryPage.items).toHaveCount(0);
 });
 
-test('la contraseña no debería estar en el código que descarga el navegador', async ({ page, request }) => {
+test('la contraseña no debería estar en el código que descarga el navegador', async ({ page, request, loginPage }) => {
   test.fail(true, 'Bug de seguridad: usuarios y contraseña están escritos en el bundle de JavaScript');
 
-  await page.goto('/');
+  await loginPage.goto();
   const scripts = await page
     .locator('script[src]')
     .evaluateAll((elements) => elements.map((element) => (element as HTMLScriptElement).src));

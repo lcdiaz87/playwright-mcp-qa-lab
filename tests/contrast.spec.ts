@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from '../pages/fixtures';
 
 type ContrastIssue = { text: string; color: string; background: string; ratio: number; required: number };
 
@@ -55,27 +56,24 @@ async function findContrastIssues(page: Page): Promise<ContrastIssue[]> {
 }
 
 test.describe('Contraste de color (WCAG AA)', () => {
-  test('página de login', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+  test('página de login', async ({ page, loginPage }) => {
+    await loginPage.goto();
+    await expect(loginPage.loginButton).toBeVisible();
 
     expect(await findContrastIssues(page)).toEqual([]);
   });
 
-  test('mensaje de error del login', async ({ page }) => {
-    await page.goto('/');
-    await page.getByRole('button', { name: 'Login' }).click();
-    await expect(page.getByRole('alert')).toBeVisible();
+  test('mensaje de error del login', async ({ page, loginPage }) => {
+    await loginPage.goto();
+    await loginPage.login('', '');
+    await expect(loginPage.error).toBeVisible();
 
     expect(await findContrastIssues(page)).toEqual([]);
   });
 
-  test('inventario', async ({ page }) => {
-    await page.goto('/');
-    await page.getByRole('textbox', { name: 'Username' }).fill('standard_user');
-    await page.getByRole('textbox', { name: 'Password' }).fill('secret_sauce');
-    await page.getByRole('button', { name: 'Login' }).click();
-    await expect(page.getByTestId('inventory-item')).toHaveCount(6);
+  test('inventario', async ({ page, loginPage, inventoryPage }) => {
+    await loginPage.loginAs('standard_user');
+    await expect(inventoryPage.items).toHaveCount(6);
 
     expect(await findContrastIssues(page)).toEqual([]);
   });
