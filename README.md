@@ -1,10 +1,12 @@
 # AI-driven exploratory testing with Playwright MCP
 
+[![Tests](https://github.com/lcdiaz87/practicaMCPPlaywright/actions/workflows/tests.yml/badge.svg)](https://github.com/lcdiaz87/practicaMCPPlaywright/actions/workflows/tests.yml)
+
 **An AI agent explores real websites through the Playwright MCP server; what it finds becomes a Playwright Test + TypeScript suite.**
 
 ## English summary
 
-**What this is.** A learning project to see what an AI agent (Claude Code) can do when it drives a real browser through [Playwright MCP](https://github.com/microsoft/playwright-mcp). Each exercise started as exploration with MCP tools (navigate, click, read the accessibility snapshot, inspect network and console) and ended as a regular Playwright test. 45 tests against two public practice sites:
+**What this is.** A learning project to see what an AI agent (Claude Code) can do when it drives a real browser through [Playwright MCP](https://github.com/microsoft/playwright-mcp). Each exercise started as exploration with MCP tools (navigate, click, read the accessibility snapshot, inspect network and console) and ended as a regular Playwright test, organised with the Page Object Model and run on every push by GitHub Actions. 45 tests against two public practice sites:
 
 | Part | Site | Tests | Deterministic? |
 |---|---|---|---|
@@ -25,6 +27,7 @@
 ```bash
 npm install
 npx playwright install chromium
+npm run typecheck # tsc, Playwright does not type-check on its own
 npm test          # 45 tests: 37 pass, 8 are expected failures (known bugs)
 ```
 
@@ -50,7 +53,7 @@ Un **servidor MCP** (Model Context Protocol) es un programa que ofrece herramien
          herramienta usar)        consola y snapshot de accesibilidad
 ```
 
-El modelo "ve" la página a través del **snapshot de accesibilidad**: el árbol de roles y nombres accesibles (`textbox "Username"`, `button "Login"`), el mismo que usa un lector de pantalla. Por eso los tests usan sobre todo `getByRole`, y `getByTestId` solo donde el snapshot no da un rol (precios, nombres de producto).
+El modelo "ve" la página a través del **snapshot de accesibilidad**: el árbol de roles y nombres accesibles (`textbox "Username"`, `button "Login"`), el mismo que usa un lector de pantalla. Por eso los page objects usan sobre todo `getByRole`, con los roles y nombres vistos en el snapshot, y `getByTestId` solo donde el snapshot no da un rol (precios, nombres de producto).
 
 Cada ejercicio siguió el mismo ciclo:
 
@@ -59,7 +62,38 @@ Cada ejercicio siguió el mismo ciclo:
 3. **Convertirlo en test** con los selectores vistos en el snapshot.
 4. **Comprobar que el test puede fallar**, no solo que pasa.
 
-Las herramientas MCP usadas: `browser_navigate`, `browser_navigate_back`, `browser_click`, `browser_type`, `browser_fill_form`, `browser_press_key`, `browser_select_option`, `browser_hover`, `browser_drag`, `browser_file_upload`, `browser_handle_dialog`, `browser_tabs`, `browser_wait_for`, `browser_snapshot`, `browser_find`, `browser_take_screenshot`, `browser_resize`, `browser_emulate_media`, `browser_evaluate`, `browser_console_messages`, `browser_network_requests`, `browser_network_request`, `browser_run_code_unsafe` y `browser_close`.
+Las herramientas MCP usadas: `browser_navigate`, `browser_click`, `browser_type`, `browser_fill_form`, `browser_press_key`, `browser_select_option`, `browser_hover`, `browser_drag`, `browser_file_upload`, `browser_handle_dialog`, `browser_tabs`, `browser_wait_for`, `browser_snapshot`, `browser_find`, `browser_take_screenshot`, `browser_resize`, `browser_emulate_media`, `browser_evaluate`, `browser_console_messages`, `browser_network_requests`, `browser_network_request`, `browser_run_code_unsafe` y `browser_close`.
+
+---
+
+## Estructura: Page Object Model
+
+Los tests de saucedemo no contienen selectores de la interfaz: cada página tiene su clase en [`pages/`](pages/) con sus localizadores y acciones, y los tests la reciben como fixture de Playwright.
+
+```ts
+test('compra completa de dos productos', async ({ loginPage, header, inventoryPage, cartPage, ... }) => {
+  await loginPage.loginAs('standard_user');
+
+  await inventoryPage.addToCart('Sauce Labs Backpack');
+  await inventoryPage.addToCart('Sauce Labs Bike Light');
+  await expect(header.cartButton).toHaveAccessibleName('Cart, 2 items');
+  await header.openCart();
+```
+
+| Page object | Qué representa |
+|---|---|
+| `LoginPage` | Formulario de login, mensaje de error y `loginAs()` |
+| `Header` | Menú lateral, Logout y carrito, comunes a todas las páginas tras el login |
+| `InventoryPage` | Productos, ordenación, añadir y quitar del carrito |
+| `CartPage` | Productos del carrito y botón Checkout |
+| `CheckoutInformationPage` | Paso 1 del checkout: datos de envío |
+| `CheckoutOverviewPage` | Paso 2: subtotal, impuesto y total |
+| `CheckoutCompletePage` | Confirmación del pedido |
+
+Dos decisiones:
+
+- **Los botones "Add to cart" se llaman igual en los 6 productos**, así que `InventoryPage` localiza cada uno dentro de la tarjeta que contiene "View details for &lt;producto&gt;". Así los tests hablan de productos por su nombre, no de identificadores internos.
+- **`the-internet.spec.ts` no usa page objects:** tiene un test por página, y una clase por cada una añadiría código sin quitar repetición.
 
 ---
 
@@ -155,6 +189,7 @@ Hay 8: los 6 de `problem_user` y 2 de seguridad.
 
 | Comando | Qué hace | ¿Internet? |
 |---|---|---|
+| `npm run typecheck` | Comprobación de tipos con `tsc` | No |
 | `npm test` | Los 45 tests en Chromium | **Sí** |
 | `npx playwright test --headed` | Lo mismo, viendo el navegador | **Sí** |
 | `npx playwright test --ui` | Modo interactivo para depurar | **Sí** |
@@ -166,15 +201,23 @@ Hay 8: los 6 de `problem_user` y 2 de seguridad.
 
 | Comprobación | Estado |
 |---|---|
+| `npm run typecheck` | ✅ Limpio |
 | `npm test` | ✅ 45 tests: 37 pasan y 8 son fallos esperados |
-| Cada `test.fail()`, ejecutado sin la marca | ✅ Falla en la aserción de su bug |
+| Cada `test.fail()`, ejecutado sin la marca | ✅ Falla en la aserción de su bug, también después del refactor a POM |
 | El test de contraste con un color malo inyectado | ✅ Lo detecta |
+| `typecheck` con un error de tipos inyectado | ✅ Lo detecta |
+
+El workflow de [GitHub Actions](.github/workflows/tests.yml) hace lo mismo en cada push a `main` y en cada pull request: `npm ci`, `typecheck`, instala Chromium, ejecuta los tests y guarda el informe HTML como artefacto durante 14 días. En CI un `test.only` olvidado rompe el build, y cada test se reintenta hasta dos veces, porque depende de webs de terceros.
 
 ---
 
 ## Mapa del repositorio
 
 ```
+pages/
+  fixtures.ts               inyecta los page objects en cada test
+  LoginPage.ts, Header.ts, InventoryPage.ts, CartPage.ts,
+  CheckoutInformationPage.ts, CheckoutOverviewPage.ts, CheckoutCompletePage.ts
 tests/
   login-roles.spec.ts       login y sus mensajes de error
   login-keyboard.spec.ts    login sin ratón
@@ -187,6 +230,8 @@ tests/
   security.spec.ts          sesión y credenciales en el cliente
   the-internet.spec.ts      the-internet.herokuapp.com
   fixtures/upload.txt       archivo para el test de subida
-playwright.config.ts        baseURL, testIdAttribute: 'data-test', trazas en fallo
+.github/workflows/tests.yml CI: typecheck y tests en cada push
+playwright.config.ts        baseURL, testIdAttribute: 'data-test', reintentos en CI
+tsconfig.json               configuración de la comprobación de tipos
 .mcp.json                   configuración del servidor Playwright MCP
 ```
