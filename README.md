@@ -1,6 +1,6 @@
 # AI-driven exploratory testing with Playwright MCP
 
-[![Tests](https://github.com/lcdiaz87/practicaMCPPlaywright/actions/workflows/tests.yml/badge.svg)](https://github.com/lcdiaz87/practicaMCPPlaywright/actions/workflows/tests.yml)
+[![Tests](https://github.com/lcdiaz87/playwright-mcp-qa-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/lcdiaz87/playwright-mcp-qa-lab/actions/workflows/tests.yml)
 
 **An AI agent explores real websites through the Playwright MCP server; what it finds becomes a Playwright Test + TypeScript suite.**
 

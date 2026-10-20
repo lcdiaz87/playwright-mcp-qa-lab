@@ -1,8 +1,7 @@
 {
-  "name": "practicamcpplaywright",
+  "name": "playwright-mcp-qa-lab",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Exploratory QA through Playwright MCP, turned into a Playwright + TypeScript test suite",
   "scripts": {
     "test": "playwright test",
     "typecheck": "tsc -p ."
